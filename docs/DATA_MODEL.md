@@ -208,27 +208,6 @@ erDiagram
 
 ## 4. Bảng Log
 
-### `sensor_logs` — Log dữ liệu cảm biến
-
-| Column | Type | Constraints | Mô tả |
-|--------|------|------------|--------|
-| `id` | `uuid` | PK | — |
-| `sensor_id` | `uuid` | FK → `sensors.id` | — |
-| `raw_value` | `int` | NOT NULL | Giá trị thô |
-| `processed_value` | `int` | NOT NULL | `0` = trống, `1` = có xe |
-| `recorded_at` | `timestamptz` | DEFAULT `now()` | — |
-
-### `slot_logs` — Log thay đổi trạng thái ô đỗ
-
-| Column | Type | Constraints | Mô tả |
-|--------|------|------------|--------|
-| `id` | `uuid` | PK | — |
-| `slot_id` | `uuid` | FK → `parking_slots.id` | — |
-| `old_status` | `varchar(20)` | NOT NULL | — |
-| `new_status` | `varchar(20)` | NOT NULL | — |
-| `trigger_source` | `varchar(20)` | NOT NULL | `sensor` · `booking` · `manual` |
-| `changed_at` | `timestamptz` | DEFAULT `now()` | — |
-
 ### `gate_logs` — Log cổng ra/vào
 
 | Column | Type | Constraints | Mô tả |
