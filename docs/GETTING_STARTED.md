@@ -97,7 +97,7 @@ SECRET_KEY=your-secret-key-here
 
 > [!CAUTION]
 > **KHÔNG BAO GIỜ** commit file `.env` lên Git. File này đã có trong `.gitignore`.
-> Hỏi **Chính** để lấy thông tin Supabase & MQTT.
+> Hỏi **Chính**, **Chiến** để lấy thông tin Supabase & MQTT.
 
 ---
 

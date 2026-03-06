@@ -1,6 +1,6 @@
 # 🔀 Quy Trình Git & Luật Push Code
 
-> Quy tắc sử dụng Git cho team 4 người, phân chia theo module.
+> Quy tắc sử dụng Git cho team 5 người, phân chia theo module.
 
 ---
 
