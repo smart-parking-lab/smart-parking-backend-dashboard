@@ -84,7 +84,6 @@ erDiagram
 | `full_name` | `varchar(100)` | NOT NULL | Họ tên |
 | `phone` | `varchar(20)` | NULLABLE | SĐT |
 | `role_id` | `int` | FK → `roles.id`, DEFAULT `1` | Vai trò |
-| `wallet_balance` | `decimal(12,2)` | DEFAULT `0.00` | Số dư ví |
 | `created_at` | `timestamptz` | DEFAULT `now()` | — |
 | `updated_at` | `timestamptz` | DEFAULT `now()` | — |
 
