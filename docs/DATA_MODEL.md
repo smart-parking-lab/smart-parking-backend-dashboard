@@ -91,9 +91,12 @@ erDiagram
 | `entry_time` | `timestamptz` | NOT NULL | Giờ vào |
 | `exit_time` | `timestamptz` | NULLABLE | NULL = đang đỗ |
 | `status` | `varchar(20)` | DEFAULT `'active'` | `active` · `completed` |
-| `entry_image_url` | `text` | NULLABLE | Ảnh khi vào |
-| `exit_image_url` | `text` | NULLABLE | Ảnh khi ra |
+| `entry_image_url` | `text` | NULLABLE | URL ảnh khi vào |
+| `exit_image_url` | `text` | NULLABLE | URL ảnh khi ra |
 | `created_at` | `timestamptz` | DEFAULT `now()` | — |
+
+> [!NOTE]
+> **Lưu trữ hình ảnh LPR**: Cột `entry_image_url` và `exit_image_url` lưu trữ Public URL. Các file ảnh gốc dạng nhị phân sẽ được Backend tự động upload lên **Supabase Storage** (ví dụ bucket tên `parking-images`) rồi lấy public URL để lưu vào bảng này.
 
 ### `pricing_rules` — Bảng giá
 

@@ -39,7 +39,6 @@ mindmap
     🚗 Người lái xe
       Tìm ô đỗ trống nhanh
       Thanh toán thuận tiện
-      Xem lịch sử (sau MVP)
     👨‍💼 Quản lý bãi
       Theo dõi real-time
       Xem báo cáo doanh thu
@@ -184,8 +183,7 @@ graph TB
 | ID | Yêu cầu | Priority |
 |----|---------|----------|
 | FR-4.1 | Đăng nhập an toàn (JWT) cho Admin quản trị | 🔴 Must |
-| FR-4.2 | Phân quyền User / Admin (vai trò User để sau MVP) | 🔴 Must |
-| FR-4.3 | Đăng ký & Đăng nhập cho End-User để lưu lịch sử | 🟡 Sau MVP |
+| FR-4.2 | Phân quyền User / Admin (chỉ thực hiện Admin trong MVP) | 🔴 Must |
 
 ### Module 5 — Payment 💳
 

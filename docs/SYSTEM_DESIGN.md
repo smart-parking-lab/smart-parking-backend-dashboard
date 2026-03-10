@@ -82,7 +82,8 @@ graph TD
 |----|-----|------------|----------|---------|
 | ESP32 | MQTT Broker | **MQTT Publish** | `{ slot_id, value, timestamp }` | Topic: `parking/sensors/{slot_id}` |
 | MQTT Broker | Backend | **MQTT Subscribe** | Tương tự trên | Backend subscribe topic wildcard |
-| LPR Service | Backend | **REST POST** | `{ plate_number, image_url, gate_id }` | Gọi khi camera phát hiện xe |
+| LPR Service | Backend | **REST POST** | `multipart/form-data` (plate_number, gate_id, image_file) | Upload ảnh qua file đính kèm |
+| Backend | Supabase Storage | **API Upload** | Image binary | Backend upload ảnh lên bucket, nhận `public_url` gắn vào database |
 | Backend | VNPay/Momo | **REST POST** | `{ amount, order_id, return_url }` | Tạo payment request |
 | VNPay/Momo | Backend | **HTTP Callback** | `{ status, transaction_id }` | IPN callback khi thanh toán xong |
 | Backend | Supabase | **PostgreSQL** | SQL queries | Qua SQLAlchemy ORM |
@@ -158,41 +159,7 @@ parking/
 
 ## 6. Sequence Diagrams Chi Tiết
 
-### 6.1 Luồng Đăng Ký & Đăng Nhập
-
-```mermaid
-sequenceDiagram
-    actor U as 👤 User
-    participant FE as 📱 Frontend
-    participant API as 🌐 FastAPI
-    participant AUTH as 🔑 Auth Service
-    participant SUPA as ☁️ Supabase Auth
-    participant DB as 🗄️ Database
-
-    Note over U,DB: === ĐĂNG KÝ ===
-    U->>FE: Nhập email, password, tên
-    FE->>API: POST /api/v1/auth/register
-    API->>AUTH: register(email, password, name)
-    AUTH->>SUPA: supabase.auth.sign_up()
-    SUPA-->>AUTH: user_id, access_token
-    AUTH->>DB: INSERT profiles (user_id, name, role)
-    AUTH-->>API: UserResponse
-    API-->>FE: 201 Created + token
-    FE-->>U: Đăng ký thành công ✅
-
-    Note over U,DB: === ĐĂNG NHẬP ===
-    U->>FE: Nhập email, password
-    FE->>API: POST /api/v1/auth/login
-    API->>AUTH: login(email, password)
-    AUTH->>SUPA: supabase.auth.sign_in_with_password()
-    SUPA-->>AUTH: access_token, refresh_token
-    AUTH-->>API: TokenResponse
-    API-->>FE: 200 OK + tokens
-    FE->>FE: Lưu token vào localStorage
-    FE-->>U: Đăng nhập thành công ✅
-```
-
-
+*(Các Sequence Diagram chi tiết về luồng xe chạy đã được di chuyển sang file ARCHITECTURE.md mục 2)*
 
 ## 7. Error Handling Strategy
 
@@ -259,8 +226,9 @@ graph TD
 
 ```mermaid
 graph LR
-    subgraph "Client"
-        FE[📱 Frontend]
+    subgraph "Clients & Services"
+        FE[📱 Web Frontend]
+        LPR[📷 LPR Service<br/>Backend 2]
     end
 
     subgraph "API Gateway"
@@ -268,35 +236,30 @@ graph LR
         RATE[Rate Limiter]
     end
 
-    subgraph "Authentication"
-        JWT_V[JWT Verify]
-        SUPA_AUTH[Supabase Auth]
-    end
-
-    subgraph "Authorization"
-        ROLE[Role Check<br/>User / Admin]
-        RLS[Row Level Security<br/>PostgreSQL]
+    subgraph "Security Check"
+        JWT_V[Xác thực bằng JWT<br/>Frontend]
+        API_KEY[Xác thực bằng API KEY<br/>Service to Service]
     end
 
     subgraph "Application"
         API[API Handlers]
-        SVC[Services]
     end
 
     subgraph "Database"
         DB[(PostgreSQL)]
     end
 
-    FE -->|HTTPS + Bearer Token| CORS
+    FE -->|HTTPs + Bearer JWT| CORS
+    LPR -->|HTTPs + Mật khẩu API_KEY| CORS
     CORS --> RATE
     RATE --> JWT_V
-    JWT_V -->|Verify token| SUPA_AUTH
-    JWT_V --> ROLE
-    ROLE --> API --> SVC --> DB
-    DB -.->|RLS Policies| RLS
+    RATE --> API_KEY
+    JWT_V --> API
+    API_KEY --> API
+    API --> DB
 
     style JWT_V fill:#ff5722,color:#fff
-    style RLS fill:#ff9800,color:#fff
+    style API_KEY fill:#ff9800,color:#fff
 ```
 
 ### Các Lớp Bảo Mật

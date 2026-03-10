@@ -10,64 +10,24 @@
 
 ```mermaid
 graph LR
-    ESP[📡 ESP32] -->|MQTT| MQTT[📨 MQTT Broker]
+    ESP_SLOT[📡 ESP32 Ô đỗ] -->|MQTT| MQTT[📨 MQTT Broker]
     MQTT -->|Subscribe| BE[🖥️ FastAPI Backend]
-    CAM[📷 LPR Service] -->|REST API| BE
+    
+    ESP_GATE[📡 ESP32 Cổng] -->|Kích hoạt Trigger| CAM[📷 LPR Service (Backend 2)]
+    CAM -->|REST API (plate, image)| BE
+    
     WEB[📱 Web App] -->|REST API| BE
     BE -->|Read/Write| DB[(🗄️ Supabase PostgreSQL)]
     DB -.->|Realtime| WEB
 
     style BE fill:#009688,color:#fff
     style DB fill:#3FCF8E,color:#fff
-    style ESP fill:#E7352C,color:#fff
-```
-
-### 1.2 Bên trong FastAPI Backend
-
-```mermaid
-graph TD
-    REQ[Request] --> MW[🔒 Middleware<br/>CORS → Rate Limit → JWT]
-    MW --> API[🌐 API Routers<br/>auth · slots · payments · sensors · gates · reports]
-    API --> SVC[🧠 Services<br/>Auth · SlotManager · Pricing · Billing · Payment · Gate · Report]
-    SVC --> DATA[🗄️ Data Layer<br/>SQLAlchemy ORM + Supabase Client]
-    DATA --> DB[(PostgreSQL)]
-
-    MQTT_IN[📡 MQTT Message] --> DAQ[📡 Data Acquisition<br/>Listener → Signal Processor]
-    DAQ --> SVC
-
-    style MW fill:#ff5722,color:#fff
-    style DB fill:#3FCF8E,color:#fff
+    style CAM fill:#ff9800,color:#fff
 ```
 
 ---
 
-## 2. Layer Architecture
-
-```
-┌──────────────────────────────────────────┐
-│  📱 Client Layer                         │
-│  Web Browser · Admin Panel · LPR         │
-├──────────────────────────────────────────┤
-│  🔒 Middleware Layer                     │
-│  CORS → Rate Limiter → JWT Verify        │
-├──────────────────────────────────────────┤
-│  🌐 API Layer  (FastAPI Routers)         │
-│  Nhận request → validate → gọi service   │
-├──────────────────────────────────────────┤
-│  🧠 Service Layer  (Business Logic)      │
-│  Xử lý nghiệp vụ → raise exceptions     │
-├──────────────────────────────────────────┤
-│  🗄️ Data Layer                           │
-│  SQLAlchemy ORM · Supabase Client · MQTT │
-├──────────────────────────────────────────┤
-│  💾 Storage                              │
-│  Supabase PostgreSQL · HiveMQ            │
-└──────────────────────────────────────────┘
-```
-
----
-
-## 3. Luồng Dữ Liệu
+## 2. Luồng Dữ Liệu
 
 ### 3.1 Cảm biến → Trạng thái ô đỗ
 
@@ -86,35 +46,40 @@ sequenceDiagram
     DB-->>FE: Supabase Realtime push
 ```
 
-### 3.2 Xe vào bãi
+### 2.2 Xe vào bãi
 
 ```mermaid
 sequenceDiagram
-    participant LPR as 📷 LPR
-    participant BE as 🖥️ Backend
+    participant ESP as 📡 Cảm biến Cổng
+    participant LPR as 📷 LPR Service
+    participant BE as 🖥️ Backend Chính
+    participant STORAGE as 🪣 Supabase Storage
     participant DB as 🗄️ Database
 
-    LPR->>BE: POST /gates/entry {plate, image}
-    BE->>DB: Tìm xe đã đăng ký?
-    alt Xe đã đăng ký (user/vé tháng)
-        BE->>DB: Tạo parking_session (gắn vehicle_id)
-        BE-->>LPR: ✅ Mở barie
-    else Xe vãng lai
-        BE->>DB: Tạo session (guest)
-        BE-->>LPR: ✅ Mở barie
-    end
+    ESP->>LPR: Phát hiện có xe (Kích hoạt Trigger)
+    LPR->>LPR: Chụp ảnh & Xử lý AI nhận diện biển số
+    LPR->>BE: POST /gates/entry (multipart: plate, image)
+    BE->>STORAGE: Upload image file
+    STORAGE-->>BE: Trả về public image_url
+    
+    BE->>DB: Tạo parking_session (guest) + entry_image_url
+    BE-->>LPR: ✅ Mở barie
 ```
 
-### 3.3 Xe ra + Tính phí
+### 2.3 Xe ra + Tính phí
 
 ```mermaid
 sequenceDiagram
     participant LPR as 📷 LPR
     participant BE as 🖥️ Backend
+    participant STORAGE as 🪣 Supabase Storage
     participant DB as 🗄️ Database
 
-    LPR->>BE: POST /gates/exit {plate}
+    LPR->>BE: POST /gates/exit (multipart: plate, image)
+    BE->>STORAGE: Upload image file
+    STORAGE-->>BE: Trả về public image_url
     BE->>DB: Tìm session active
+    BE->>DB: Update session (exit_image_url, exit_time)
     BE->>BE: Tính phí (PricingEngine)
     BE->>DB: Tạo invoice (status='pending')
     BE-->>LPR: Phản hồi số tiền
@@ -196,8 +161,9 @@ app.include_router(reports.router,  prefix="/api/v1/reports")
 
 | Method | Path | Mô tả | Auth |
 |--------|------|--------|------|
-| `POST` | `/entry` | Xe vào (từ LPR) | ✅ Service |
-| `POST` | `/exit` | Xe ra (từ LPR) | ✅ Service |
+| `POST` | `/entry` | Nhận diện biển số, upload ảnh + mở barie vào | ❌ (LPR gọi nội bộ) |
+| `POST` | `/exit` | Nhận diện biển số, upload ảnh + báo giá tiền | ❌ (LPR gọi nội bộ) |
+| `POST` | `/{id}/manual-open` | Nhân viên mở cổng bằng tay | ✅ |
 | `GET` | `/logs` | Lịch sử ra/vào | ✅ Admin |
 
 ### Reports (`/api/v1/reports`)
