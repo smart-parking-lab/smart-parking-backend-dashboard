@@ -33,9 +33,8 @@ parking-management-system/
 │   ├── 📂 models/                   # 🗄️ SQLAlchemy ORM models
 │   │   ├── user.py                  # Bảng users
 │   │   ├── slot.py                  # Bảng parking_slots
-│   │   ├── payment.py               # Bảng payments
-│   │   ├── sensor.py                # Bảng sensors
-│   │   └── gate_log.py              # Bảng gate_logs
+│   │   ├── invoice.py               # Bảng invoices
+│   │   └── parking_session.py       # Bảng parking_sessions
 │   │
 │   ├── 📂 schemas/                  # 📋 Pydantic request/response
 │   │   ├── auth.py                  # Login, Register schemas

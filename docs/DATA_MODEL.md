@@ -131,22 +131,6 @@ erDiagram
 
 ---
 
-## 4. Bảng Log
-
-
-
-### `gate_logs` — Log cổng ra/vào
-
-| Column | Type | Constraints | Mô tả |
-|--------|------|------------|--------|
-| `id` | `uuid` | PK | — |
-| `gate_type` | `varchar(10)` | NOT NULL | `entry` · `exit` |
-| `plate_number` | `varchar(20)` | NOT NULL | — |
-| `image_url` | `text` | NULLABLE | Ảnh chụp |
-| `action` | `varchar(10)` | NOT NULL | `open` · `deny` |
-| `reason` | `varchar(100)` | NULLABLE | Lý do |
-| `created_at` | `timestamptz` | DEFAULT `now()` | — |
-
 ---
 
 ## 5. Indexes
@@ -171,7 +155,6 @@ Bật Realtime cho các bảng cần cập nhật real-time:
 |------|--------|-----------------|
 | `parking_slots` | `UPDATE` | Cập nhật sơ đồ bãi xe |
 | `sensors` | `UPDATE` | Dashboard trạng thái sensor |
-| `gate_logs` | `INSERT` | Thông báo xe vào/ra |
 
 ---
 
