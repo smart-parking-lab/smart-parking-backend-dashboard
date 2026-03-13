@@ -3,11 +3,13 @@ import os
 
 # Đường dẫn gốc của project
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
+SRC_PATH = os.path.join(PROJECT_ROOT, "src")
 
-from src.app.utils.supabase import engine
-from src.app.model import Base
+if SRC_PATH not in sys.path:
+    sys.path.append(SRC_PATH)
+
+from app.utils.supabase import engine
+from app.model import Base
 
 def init_db():
     try:
