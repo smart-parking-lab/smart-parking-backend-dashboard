@@ -8,7 +8,6 @@ from app.api.auth import router as auth_router
 from app.api.vehicle import router as vehicle_router
 from app.api.admin import router as admin_router
 from app.api.pricing_rules import router as pricing_rules_router
-from app.api.parking_sessions import router as parking_sessions_router
 from app.core.dependencies import security
 
 load_dotenv()
