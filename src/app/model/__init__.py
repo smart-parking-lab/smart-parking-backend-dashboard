@@ -5,6 +5,6 @@ from app.model.vehicle_type import VehicleType
 from app.model.vehicle import Vehicle
 from app.model.pricing_rules import PricingRule
 from app.model.parking_sessions import ParkingSession
+from app.model.invoices import Invoice
 
-__all__ = ["Base", "User", "Role", "VehicleType", "Vehicle", "PricingRule", "ParkingSession"]
-
+__all__ = ["Base", "User", "Role", "VehicleType", "Vehicle", "PricingRule", "ParkingSession", "Invoice"]

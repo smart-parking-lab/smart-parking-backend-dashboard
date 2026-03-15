@@ -9,6 +9,7 @@ from app.api.vehicle import router as vehicle_router
 from app.api.admin import router as admin_router
 from app.api.pricing_rules import router as pricing_rules_router
 from app.api.parking_sessions import router as parking_sessions_router
+from app.api.invoices import router as invoices_router
 from app.core.dependencies import security
 
 load_dotenv()
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router, prefix="/api/v1")
     app.include_router(pricing_rules_router, prefix="/api/v1")
     app.include_router(parking_sessions_router, prefix="/api/v1")
+    app.include_router(invoices_router, prefix="/api/v1")
 
     @app.get("/", tags=["Health"])
     def health_check():
