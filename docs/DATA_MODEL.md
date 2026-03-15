@@ -63,11 +63,8 @@ erDiagram
 | `id` | `uuid` | PK | — |
 | `slot_code` | `varchar(10)` | UNIQUE, NOT NULL | `A01`, `B12` |
 | `status` | `varchar(20)` | DEFAULT `'available'` | `available` · `occupied` · `maintenance` |
-| `zone` | `varchar(5)` | NOT NULL | Khu vực: `A`, `B`, `C` |
-| `floor` | `int` | DEFAULT `1` | Tầng |
 | `position_x` | `int` | NULLABLE | Tọa độ X trên sơ đồ |
 | `position_y` | `int` | NULLABLE | Tọa độ Y trên sơ đồ |
-| `sensor_id` | `uuid` | FK → `sensors.id`, NULLABLE | Cảm biến gắn ô này |
 | `updated_at` | `timestamptz` | DEFAULT `now()` | — |
 
 ### `sensors` — Cảm biến
