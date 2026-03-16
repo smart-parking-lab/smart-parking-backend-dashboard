@@ -73,7 +73,6 @@ erDiagram
 |--------|------|------------|--------|
 | `id` | `uuid` | PK | — |
 | `sensor_code` | `varchar(20)` | UNIQUE, NOT NULL | `IR_A01` |
-| `board_id` | `varchar(20)` | NOT NULL | `esp32_01` |
 | `slot_id` | `uuid` | FK → `parking_slots.id`, NULLABLE | Ô đỗ mà sensor giám sát |
 | `status` | `varchar(20)` | DEFAULT `'offline'` | `online` · `offline` · `error` |
 | `last_heartbeat` | `timestamptz` | NULLABLE | Lần heartbeat cuối |
