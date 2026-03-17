@@ -6,311 +6,202 @@
 
 ## 1. System Context
 
-Hệ thống giao tiếp với các thành phần bên ngoài:
+Hệ thống gồm 2 backend độc lập, giao tiếp với các thành phần bên ngoài:
 
 ```mermaid
 graph TB
-    subgraph "External"
-        U[👤 Người dùng<br/>Web Browser]
-        ESP[📡 ESP32<br/>Cảm biến hồng ngoại]
-        LPR[📷 LPR Service<br/>Repo riêng]
-        PAY[💳 VNPay / Momo<br/>Payment Gateway]
-        MQTT_B[📨 MQTT Broker<br/>HiveMQ / Mosquitto]
+    subgraph "External Devices"
+        CAM[📷 ESP32 Camera<br/>Cổng vào / ra]
+        SEN[📡 ESP32 Cảm biến<br/>Từng ô đỗ]
     end
 
-    subgraph "Smart Parking Backend"
-        API[🌐 FastAPI Server]
+    subgraph "Backend 1 — LPR Service (Python/FastAPI)"
+        LPR[🤖 Nhận diện biển số<br/>+ Quản lý parking_sessions<br/>+ Tính tiền]
+    end
+
+    subgraph "Backend 2 — Main Service (Python/FastAPI)"
+        MAIN[🌐 Auth · Dashboard<br/>Pricing Config · Lịch sử<br/>Sửa thủ công]
     end
 
     subgraph "Data Layer"
-        DB[(🗄️ Supabase<br/>PostgreSQL + Realtime)]
+        DB[(🗄️ Supabase<br/>PostgreSQL + Realtime + Storage)]
     end
 
-    U -->|REST API| API
-    U -.->|Supabase Realtime| DB
-    ESP -->|MQTT Publish| MQTT_B
-    MQTT_B -->|MQTT Subscribe| API
-    LPR -->|REST API| API
-    API -->|REST API| PAY
-    PAY -->|Callback| API
-    API -->|Read/Write| DB
+    subgraph "Frontend"
+        FE[💻 Web Dashboard<br/>Admin / Nhân viên]
+    end
 
-    style API fill:#009688,color:#fff
+    CAM -->|multipart/form-data ảnh thẳng| LPR
+    LPR -->|Trả response barrier open/close| CAM
+    LPR -->|INSERT / UPDATE parking_sessions| DB
+    LPR -->|async upload ảnh| DB
+
+    SEN -->|REST API trực tiếp| DB
+
+    MAIN -->|CRUD auth, config, lịch sử| DB
+    FE -->|REST API + JWT| MAIN
+    FE -.->|Supabase Realtime| DB
+
+    style LPR fill:#1565C0,color:#fff
+    style MAIN fill:#009688,color:#fff
     style DB fill:#3FCF8E,color:#fff
-    style ESP fill:#E7352C,color:#fff
+    style CAM fill:#E7352C,color:#fff
+    style SEN fill:#E7352C,color:#fff
 ```
 
 ---
 
-## 2. High-Level Components
+## 2. Phân Chia Trách Nhiệm Rõ Ràng
+
+| | Backend 1 — LPR Service | Backend 2 — Main Service |
+|---|---|---|
+| **Vai trò** | Xử lý luồng xe vào/ra | Quản lý hệ thống |
+| **Owns table** | `parking_sessions` | `users`, `pricing_config`, `parking_slots` (config) |
+| **Trigger** | ESP32 Camera gửi ảnh | Web Dashboard, Admin |
+| **Logic** | Nhận diện AI + tính tiền | Auth, thống kê, cấu hình |
+| **Barrier** | Trả lệnh mở/đóng | Không liên quan |
+
+> **Nguyên tắc:** 2 BE **không gọi nhau**, đều đọc/ghi Supabase trực tiếp. Tách concern rõ ràng, 1 cái crash cái kia vẫn sống.
+
+---
+
+## 3. Luồng Xe Vào Chi Tiết
 
 ```mermaid
-graph TD
-    subgraph "API Layer"
-        API[Routers: auth - slots - payments<br/>sensors - gates - reports]
-    end
+sequenceDiagram
+    participant CAM as 📷 ESP32 Camera
+    participant LPR as 🤖 BE1 LPR Service
+    participant DB as 🗄️ Supabase
+    participant BAR as 🚧 Barrier
 
-    subgraph "Service Layer"
-        SVC[Services: Auth - SlotManager - Pricing<br/>Billing - Payment - Gate - Report]
-    end
-
-    subgraph "Data Acquisition"
-        DAQ[MQTT Listener - Signal Processor - Heartbeat]
-    end
-
-    subgraph "Core"
-        CORE[CORS - JWT Security - Error Handlers]
-    end
-
-    subgraph "Data Layer"
-        DATA[SQLAlchemy ORM - Supabase Client - MQTT Client]
-        DB[(PostgreSQL)]
-    end
-
-    CORE --> API --> SVC --> DATA --> DB
-    DAQ --> SVC
-
-    style CORE fill:#ff5722,color:#fff
-    style DB fill:#3FCF8E,color:#fff
+    CAM->>LPR: POST /recognize (multipart ảnh)
+    LPR->>LPR: Chạy model AI nhận diện biển số
+    LPR->>DB: Query pricing_config (lấy giá hiện tại)
+    DB-->>LPR: { price_per_hour, ... }
+    LPR->>DB: INSERT parking_sessions { plate, entry_time, status: active }
+    DB-->>LPR: { session_id, ... }
+    LPR-->>CAM: { success: true, plate: "51A-123", session_id }
+    CAM->>BAR: Mở barrier (PWM signal)
+    Note over LPR,DB: async — không chặn barrier
+    LPR->>DB: Upload ảnh → Supabase Storage (lấy public_url)
+    LPR->>DB: UPDATE parking_sessions SET image_entry_url
 ```
 
 ---
 
-## 3. Giao Tiếp Giữa Các Hệ Thống Con
+## 4. Luồng Xe Ra Chi Tiết
 
-| Từ | Đến | Phương thức | Dữ liệu | Ghi chú |
-|----|-----|------------|----------|---------|
-| ESP32 | MQTT Broker | **MQTT Publish** | `{ slot_id, value, timestamp }` | Topic: `parking/sensors/{slot_id}` |
-| MQTT Broker | Backend | **MQTT Subscribe** | Tương tự trên | Backend subscribe topic wildcard |
-| LPR Service | Backend | **REST POST** | `multipart/form-data` (plate_number, gate_id, image_file) | Upload ảnh qua file đính kèm |
-| Backend | Supabase Storage | **API Upload** | Image binary | Backend upload ảnh lên bucket, nhận `public_url` gắn vào database |
-| Backend | VNPay/Momo | **REST POST** | `{ amount, order_id, return_url }` | Tạo payment request |
-| VNPay/Momo | Backend | **HTTP Callback** | `{ status, transaction_id }` | IPN callback khi thanh toán xong |
-| Backend | Supabase | **PostgreSQL** | SQL queries | Qua SQLAlchemy ORM |
-| Supabase | Frontend | **Supabase Realtime** | `{ slot_id, status, updated_at }` | Frontend subscribe trực tiếp, không qua backend |
+```mermaid
+sequenceDiagram
+    participant CAM as 📷 ESP32 Camera
+    participant LPR as 🤖 BE1 LPR Service
+    participant DB as 🗄️ Supabase
+    participant BAR as 🚧 Barrier
+    participant LCD as 🖥️ LCD Display
+
+    CAM->>LPR: POST /recognize (multipart ảnh)
+    LPR->>LPR: Chạy model AI nhận diện biển số
+    LPR->>DB: Query parking_sessions WHERE plate = X AND status = active
+    DB-->>LPR: { session_id, entry_time, slot_id }
+    LPR->>DB: Query pricing_config (giá theo giờ hiện tại)
+    LPR->>LPR: Tính tiền (xử lý đêm/ngày)
+    LPR->>DB: UPDATE parking_sessions { exit_time, duration, fee, status: completed }
+    LPR-->>CAM: { success: true, fee: 13000, duration: 90 }
+    CAM->>LCD: Hiển thị số tiền
+    CAM->>BAR: Mở barrier
+    Note over LPR,DB: async
+    LPR->>DB: Upload ảnh ra → Storage
+    LPR->>DB: UPDATE parking_sessions SET image_exit_url
+```
 
 ---
 
-## 4. Chi Tiết Protocol MQTT
+## 5. Luồng Cảm Biến Ô Đỗ
 
-### Topic Structure
+```mermaid
+sequenceDiagram
+    participant SEN as 📡 ESP32 Cảm biến
+    participant DB as 🗄️ Supabase
+    participant FE as 💻 Dashboard
 
-```
-parking/
-├── sensors/
-│   ├── slot_001          # Dữ liệu từ cảm biến ô đỗ 001
-│   ├── slot_002
-│   └── ...
-├── heartbeat/
-│   ├── esp32_01          # Heartbeat từ ESP32 board 01
-│   └── ...
-└── commands/
-    └── gate/             # Lệnh đóng/mở barie
+    SEN->>DB: PATCH /parking_slots?id=eq.{slot_id}<br/>{ status: "occupied" }
+    DB-->>SEN: 200 OK
+    DB-)FE: Supabase Realtime push { slot_id, status }
+    FE->>FE: Cập nhật sơ đồ bãi xe real-time
 ```
 
-### Payload Format
-
-```json
-// Topic: parking/sensors/slot_001
-{
-  "slot_id": "slot_001",
-  "value": 1,
-  "raw_value": 2847,
-  "board_id": "esp32_01",
-  "timestamp": 1709712000
-}
-```
-
-| Field | Type | Mô tả |
-|-------|------|--------|
-| `slot_id` | string | ID ô đỗ |
-| `value` | int | `1` = có xe, `0` = trống |
-| `raw_value` | int | Giá trị thô từ cảm biến (debug) |
-| `board_id` | string | ID board ESP32 |
-| `timestamp` | int | Unix timestamp |
-
-### QoS & Retention
-
-| Setting | Giá trị | Lý do |
-|---------|---------|-------|
-| QoS | **1** (At least once) | Đảm bảo data không mất, chấp nhận duplicate |
-| Retain | **true** | Khi backend restart, nhận được state cuối cùng |
-| Keep Alive | **60s** | Phát hiện mất kết nối nhanh |
+> ESP32 cảm biến gọi **thẳng Supabase REST API** — không cần qua backend nào. Logic đơn giản, giảm tải hoàn toàn cho cả 2 BE.
 
 ---
 
-## 5. Công Nghệ & Lý Do Chọn
+## 6. Công Nghệ Sử Dụng
 
 | Thành phần | Công nghệ | Lý do |
 |-----------|-----------|-------|
-| **Backend Framework** | FastAPI | Async, auto docs (Swagger), type hints, performance tốt |
-| **ORM** | SQLAlchemy | Mature, relationship mapping mạnh, migration support |
-| **Database** | Supabase (PostgreSQL) | Free tier đủ dùng, built-in Auth/RLS, Realtime subscriptions |
-| **Package Manager** | UV | Nhanh gấp 10-100x pip, lockfile chính xác, từ Astral |
-| **Type Checker** | ty | Nhanh gấp 10-100x mypy, từ Astral, tích hợp tốt với UV |
-| **Linter** | Ruff | Nhanh, thay thế cả flake8 + isort + black, từ Astral |
-| **IoT Protocol** | MQTT | Lightweight, pub/sub phù hợp IoT, hỗ trợ QoS |
-| **MQTT Broker** | HiveMQ Cloud | Free tier, managed, không cần tự host |
-| **Auth** | Supabase Auth + JWT | Sẵn có, hỗ trợ OAuth, email/password |
-| **Microcontroller** | ESP32 | WiFi built-in, GPIO đủ, Arduino/PlatformIO support |
-| **Cảm biến** | Hồng ngoại (IR) | Rẻ, đơn giản, phát hiện vật cản chính xác |
+| **BE1 LPR** | Python FastAPI | Async, tích hợp AI/ML dễ |
+| **BE2 Main** | Python FastAPI | Đồng nhất stack, auto Swagger |
+| **ORM** | SQLAlchemy | Mature, migration support |
+| **Database** | Supabase (PostgreSQL) | Free tier, Realtime, Auth, Storage sẵn |
+| **Realtime** | Supabase Realtime | Dashboard cập nhật sơ đồ bãi xe |
+| **Storage** | Supabase Storage | Lưu ảnh biển số vào/ra |
+| **IoT** | ESP32 WiFi | Built-in WiFi, GPIO đủ dùng |
+| **Cảm biến** | Hồng ngoại (IR) | Đơn giản, chính xác, rẻ |
+| **Package Manager** | UV | Nhanh hơn pip 10-100x |
+| **Linter** | Ruff | Thay thế flake8 + black + isort |
+| **Payment** | Tiền mặt (v1) | Đơn giản, đủ cho MVP — nâng cấp VNPay/Momo sau |
 
 ---
 
-## 6. Sequence Diagrams Chi Tiết
-
-*(Các Sequence Diagram chi tiết về luồng xe chạy đã được di chuyển sang file ARCHITECTURE.md mục 2)*
-
-## 7. Error Handling Strategy
-
-### Phân Loại Lỗi
-
-```mermaid
-graph TD
-    ERR[Lỗi phát sinh] --> CLIENT[Client Error 4xx]
-    ERR --> SERVER[Server Error 5xx]
-    ERR --> INFRA[Infrastructure Error]
-
-    CLIENT --> C1[400 Bad Request<br/>Dữ liệu không hợp lệ]
-    CLIENT --> C2[401 Unauthorized<br/>Chưa đăng nhập]
-    CLIENT --> C3[403 Forbidden<br/>Không có quyền]
-    CLIENT --> C4[404 Not Found<br/>Không tìm thấy]
-    CLIENT --> C5[409 Conflict<br/>Trùng lặp/xung đột]
-
-    SERVER --> S1[500 Internal<br/>Lỗi không mong đợi]
-
-    INFRA --> I1[MQTT Broker mất kết nối]
-    INFRA --> I2[Supabase timeout]
-    INFRA --> I3[Cảm biến mất tín hiệu]
-```
-
-### Response Format Thống Nhất
-
-```json
-// ✅ Success
-{
-  "success": true,
-  "data": { ... },
-  "message": "Thao tác thành công"
-}
-
-// ❌ Error
-{
-  "success": false,
-  "error": {
-    "code": "SLOT_NOT_FOUND",
-    "message": "Ô đỗ slot_042 không tồn tại",
-    "details": null
-  }
-}
-```
-
-### Error Codes
-
-| Code | HTTP | Mô tả |
-|------|------|--------|
-| `VALIDATION_ERROR` | 400 | Dữ liệu request không hợp lệ |
-| `UNAUTHORIZED` | 401 | Token hết hạn hoặc không hợp lệ |
-| `FORBIDDEN` | 403 | Không có quyền thực hiện thao tác |
-| `NOT_FOUND` | 404 | Resource không tồn tại |
-| `SLOT_NOT_AVAILABLE` | 409 | Ô đỗ đã có xe hoặc đã được đặt |
-| `BOOKING_EXPIRED` | 409 | Đặt chỗ đã hết hạn |
-| `INSUFFICIENT_BALANCE` | 402 | Số dư ví không đủ |
-| `PAYMENT_FAILED` | 502 | Cổng thanh toán lỗi |
-| `SENSOR_OFFLINE` | 503 | Cảm biến mất kết nối |
-| `INTERNAL_ERROR` | 500 | Lỗi server không xác định |
-
----
-
-## 8. Security Architecture
-
-```mermaid
-graph LR
-    subgraph "Clients & Services"
-        FE[📱 Web Frontend]
-        LPR[📷 LPR Service<br/>Backend 2]
-    end
-
-    subgraph "API Gateway"
-        CORS[CORS Filter]
-        RATE[Rate Limiter]
-    end
-
-    subgraph "Security Check"
-        JWT_V[Xác thực bằng JWT<br/>Frontend]
-        API_KEY[Xác thực bằng API KEY<br/>Service to Service]
-    end
-
-    subgraph "Application"
-        API[API Handlers]
-    end
-
-    subgraph "Database"
-        DB[(PostgreSQL)]
-    end
-
-    FE -->|HTTPs + Bearer JWT| CORS
-    LPR -->|HTTPs + Mật khẩu API_KEY| CORS
-    CORS --> RATE
-    RATE --> JWT_V
-    RATE --> API_KEY
-    JWT_V --> API
-    API_KEY --> API
-    API --> DB
-
-    style JWT_V fill:#ff5722,color:#fff
-    style API_KEY fill:#ff9800,color:#fff
-```
-
-### Các Lớp Bảo Mật
-
-| Lớp | Cơ chế | Mô tả |
-|-----|--------|--------|
-| **Transport** | HTTPS | Mã hóa toàn bộ traffic |
-| **CORS** | Whitelist origins | Chỉ cho phép domain frontend |
-| **Rate Limiting** | Token bucket | Chống brute force, DDoS |
-| **Authentication** | JWT (Supabase) | Xác thực người dùng |
-| **Authorization** | Role-based (User/Admin) | Phân quyền theo vai trò |
-| **Data** | RLS (PostgreSQL) | User chỉ thấy data của mình |
-| **Input** | Pydantic validation | Validate mọi input từ client |
-| **Secrets** | `.env` + Supabase Vault | Không hardcode secrets |
-
----
-
-## 9. Deployment Overview
+## 7. Deployment Overview
 
 ```mermaid
 graph TB
-    subgraph "Development"
-        DEV[💻 Local Machine]
-        UV_DEV[UV + FastAPI dev]
+    subgraph "Local Machine (Demo)"
+        BE1[🤖 BE1 LPR Service<br/>terminal 1 — port 8001]
+        BE2[🌐 BE2 Main Service<br/>terminal 2 — port 8000]
     end
 
-    subgraph "Cloud Services"
-        SUPA_CLOUD[☁️ Supabase Cloud<br/>Database + Auth + Realtime]
-        MQTT_CLOUD[📨 HiveMQ Cloud<br/>MQTT Broker]
+    subgraph "Cloud"
+        SUPA[☁️ Supabase Cloud<br/>DB + Auth + Storage + Realtime]
     end
 
     subgraph "Edge Devices"
-        ESP_1[📡 ESP32 #1<br/>Khu A - 10 ô đỗ]
-        ESP_2[📡 ESP32 #2<br/>Khu B - 10 ô đỗ]
-        CAM[📷 Camera<br/>Cổng vào/ra]
+        CAM[📷 ESP32 Camera Gate]
+        SEN1[📡 ESP32 Cảm biến Khu A]
+        SEN2[📡 ESP32 Cảm biến Khu B]
     end
 
-    DEV -->|SQL + REST| SUPA_CLOUD
-    DEV -->|MQTT Subscribe| MQTT_CLOUD
-    ESP_1 -->|MQTT Publish| MQTT_CLOUD
-    ESP_2 -->|MQTT Publish| MQTT_CLOUD
-    CAM -->|REST API| DEV
+    CAM -->|LAN / WiFi| BE1
+    BE1 --> SUPA
+    BE2 --> SUPA
+    SEN1 -->|WiFi → Internet| SUPA
+    SEN2 -->|WiFi → Internet| SUPA
 
-    style SUPA_CLOUD fill:#3FCF8E,color:#fff
-    style MQTT_CLOUD fill:#660066,color:#fff
-    style ESP_1 fill:#E7352C,color:#fff
-    style ESP_2 fill:#E7352C,color:#fff
+    style SUPA fill:#3FCF8E,color:#fff
+    style BE1 fill:#1565C0,color:#fff
+    style BE2 fill:#009688,color:#fff
 ```
 
-> [!NOTE]
-> **Môi trường demo**: Backend chạy trên máy local, kết nối Supabase Cloud và HiveMQ Cloud. ESP32 kết nối WiFi cùng mạng LAN hoặc qua internet.
+> **Môi trường demo:** 2 backend chạy local (2 terminal), kết nối Supabase Cloud. ESP32 cùng mạng LAN hoặc qua internet.
+
+---
+
+## 8. Bottleneck & Optimization
+
+> Optimize đúng chỗ, không waste thời gian vào những thứ không phải vấn đề.
+
+| Yếu tố | Ảnh hưởng | Hành động |
+|--------|-----------|-----------|
+| ESP32 WiFi upload ảnh | ⚠️ Cao | Resize ảnh về 640×480 trước khi gửi |
+| Model AI nhận diện | ⚠️ Cao | Dùng model nhẹ (YOLOv8n + EasyOCR) |
+| Upload Storage (ảnh) | ✅ Không chặn | Chạy async sau khi mở barrier |
+| HTTP call giữa 2 BE | ✅ Không có | 2 BE không gọi nhau |
+| Supabase write | ✅ Chấp nhận được | ~100ms, không ảnh hưởng UX |
+
+**Thứ tự ưu tiên tối ưu:**
+1. Chất lượng + kích thước ảnh từ ESP32
+2. Tốc độ model AI (inference time)
+3. Ổn định WiFi tại cổng vào/ra
 
 ---
 
