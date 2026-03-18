@@ -88,10 +88,10 @@ Sau khi chạy xong, bạn có thể truy cập:
 | File | Nội dung |
 |------|----------|
 | [📋 PROBLEM_DEFINITION.md](docs/PROBLEM_DEFINITION.md) | Định nghĩa bài toán, stakeholders, requirements |
-| [🏗️ SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) | Thiết kế hệ thống, giao tiếp, MQTT protocol |
+| [🏗️ SYSTEM_DESIGN.md](docs/system/SYSTEM_DESIGN.md) | Thiết kế hệ thống, giao tiếp, MQTT protocol |
 | [🎯 MVP_SCOPE.md](docs/MVP_SCOPE.md) | Phạm vi MVP, sprint plan, risk mitigation |
-| [🗄️ DATA_MODEL.md](docs/DATA_MODEL.md) | ER diagram, chi tiết bảng, indexes, RLS |
-| [🏛️ ARCHITECTURE.md](docs/ARCHITECTURE.md) | Kiến trúc chi tiết, API endpoints, luồng dữ liệu |
+| [🗄️ DATA_MODEL.md](docs/system/DATA_MODEL.md) | ER diagram, chi tiết bảng, indexes, RLS |
+| [🏛️ ARCHITECTURE.md](docs/system/ARCHITECTURE.md) | Kiến trúc chi tiết, API endpoints, luồng dữ liệu |
 | [📁 PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | Cấu trúc thư mục, tổ chức code, hướng dẫn thêm mới |
 | [🔀 GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) | Luật push code, quy trình PR, commit convention |
 | [🚀 GETTING_STARTED.md](docs/GETTING_STARTED.md) | Hướng dẫn cài đặt & khởi động dự án |

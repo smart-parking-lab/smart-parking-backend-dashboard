@@ -195,6 +195,6 @@ Bật Realtime cho các bảng cần cập nhật real-time:
 ---
 
 <p align="center">
-  <a href="MVP_SCOPE.md">← MVP Scope</a> •
+  <a href="../MVP_SCOPE.md">← MVP Scope</a> •
   <a href="ARCHITECTURE.md">Architecture →</a>
 </p>

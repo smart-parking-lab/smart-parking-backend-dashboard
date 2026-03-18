@@ -206,6 +206,6 @@ graph TB
 ---
 
 <p align="center">
-  <a href="PROBLEM_DEFINITION.md">← Định nghĩa bài toán</a> •
-  <a href="MVP_SCOPE.md">Phạm vi MVP →</a>
+  <a href="../PROBLEM_DEFINITION.md">← Định nghĩa bài toán</a> •
+  <a href="../MVP_SCOPE.md">Phạm vi MVP →</a>
 </p>

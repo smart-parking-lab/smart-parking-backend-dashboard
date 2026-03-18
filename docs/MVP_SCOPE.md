@@ -112,6 +112,6 @@ gantt
 ---
 
 <p align="center">
-  <a href="SYSTEM_DESIGN.md">← System Design</a> •
-  <a href="DATA_MODEL.md">Data Model →</a>
+  <a href="system/SYSTEM_DESIGN.md">← System Design</a> •
+  <a href="system/DATA_MODEL.md">Data Model →</a>
 </p>
