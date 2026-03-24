@@ -7,6 +7,7 @@ from typing import Optional
 class InvoiceResponse(BaseModel):
     id: UUID
     session_id: UUID
+    plate_number: str
     pricing_rule_id: Optional[UUID]
     duration_minutes: Optional[float]
     amount: Optional[float]
