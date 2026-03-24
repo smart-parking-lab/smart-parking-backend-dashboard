@@ -1,7 +1,7 @@
 import re
 from fastapi import HTTPException
 
-PLATE_NUMBER_REGEX = re.compile(r"^[0-9]{2}[- ]?[A-Z][0-9A-Z]?[- ]?[0-9]{3,5}([- .]?[0-9]{1,2})?$")
+PLATE_NUMBER_REGEX = re.compile(r"^[0-9]{2}[A-Z]{1,2}[0-9]{5}$")
 
 def validate_plate_number(plate_number: str) -> str:
     plate_number = plate_number.strip().upper()

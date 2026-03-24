@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from app.model import Vehicle,ParkingSession
 from fastapi import HTTPException
 from datetime import datetime
-
+from app.services.invoices_services import create_invoice, checkout_invoice
+from app.schemas.invoices import InvoiceCreate, InvoiceCheckout
 async def upload_image(image: UploadFile):
     file_name = f"{uuid.uuid4()}_{image.filename}"
 
@@ -69,4 +70,19 @@ async def update_parking_session(db: Session, plate_number: str, exit_image: Upl
     db.refresh(parking_session)
     
     time_total = (parking_session.exit_time - parking_session.entry_time).total_seconds() / 60
-    return int(time_total) 
+    invoice =create_invoice(db, InvoiceCreate(session_id=parking_session.id))
+    invoice_checkout = checkout_invoice(db, InvoiceCheckout(id=invoice.id, time_total=int(time_total)))
+    return invoice_checkout
+
+def check_car_in_parking(db: Session, plate_number: str):
+    vehicle = db.query(Vehicle).filter(Vehicle.plate_number == plate_number).first()
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    parking_session = db.query(ParkingSession).filter(
+        ParkingSession.vehicle_id == vehicle.id, 
+        ParkingSession.status == "active"
+    ).order_by(ParkingSession.entry_time.desc()).first()
+    if not parking_session:
+        raise HTTPException(status_code=404, detail="Active parking session not found")
+    return parking_session
+    
