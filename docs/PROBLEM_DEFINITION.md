@@ -367,5 +367,5 @@ sequenceDiagram
 ---
 
 <p align="center">
-  <b>Tài liệu tiếp theo:</b> <a href="SYSTEM_DESIGN.md">🏗️ System Design →</a>
+  <b>Tài liệu tiếp theo:</b> <a href="system/SYSTEM_DESIGN.md">🏗️ System Design →</a>
 </p>

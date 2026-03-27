@@ -22,3 +22,16 @@ Tài liệu này định nghĩa các quy tắc bắt buộc mà AI Agent phải 
 - Luôn phải có block xử lý lỗi rõ ràng, xử lý trạng thái loading (nếu là UI), và kiểm tra bắt rỗng/null/None dữ liệu một cách đầy đủ.
 - Có thể thêm các helper/custom exception xử lý lỗi cho toàn bộ ứng dụng nếu cần.
 - **Tư duy tổng thể:** Ưu tiên giải pháp có thể tái sử dụng ứng dụng quy mô toàn hệ thống thay vì code 'chắp vá' chỉ để giải quyết được một task phụ/nhỏ.
+## 5. Quy tắc Unit Test & Testing (Bắt buộc)
+- ​Việc viết mã nguồn phải luôn đi kèm với việc đảm bảo tính đúng đắn thông qua kiểm thử tự động.
+​- Viết Test trước hoặc song hành với Code: * Mọi logic nghiệp vụ (Service), xử lý dữ liệu (Utils) hoặc API endpoint mới được tạo ra bắt buộc phải có file Unit Test tương ứng.
+​Ưu tiên tư duy TDD (Test-Driven Development) để xác định đầu vào/đầu ra mong muốn trước khi triển khai logic chi tiết.
+​- Vị trí và Đặt tên:
+​- Tất cả các file test phải nằm trong thư mục tests/ hoặc theo cấu trúc quy định tại docs/PROJECT_STRUCTURE.md.
+- ​Tên file test phải phản ánh đúng file logic cần kiểm tra (Ví dụ: services/auth_service.py đi kèm với tests/test_auth_service.py).
+- ​Độ bao phủ (Coverage) & Kịch bản:
+- ​Phải kiểm tra ít nhất 2 kịch bản: Happy Path (Dữ liệu chuẩn, thành công) và Edge Cases/Error Handling (Dữ liệu lỗi, null, sai định dạng, quá hạn, v.v.).
+- ​Sử dụng Mocking cho các thành phần bên ngoài như Database, Third-party API, hoặc IoT Sensor để đảm bảo Unit Test chạy độc lập và nhanh chóng.
+- ​Kiểm tra trước khi Commit:
+- ​AI Agent phải tự chạy bộ test hiện có để đảm bảo code mới không làm "gãy" (break) các tính năng cũ.
+- ​Nếu phát hiện lỗi trong quá trình chạy test, phải sửa lỗi trước khi thực hiện commit theo docs/GIT_WORKFLOW.md.
