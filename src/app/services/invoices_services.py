@@ -6,8 +6,9 @@ from app.model.parking_sessions import ParkingSession
 from app.model.pricing_rules import PricingRule
 from app.model.vehicle_type import VehicleType
 from app.model.vehicle import Vehicle
-from app.schemas.invoices import InvoiceCreate, InvoiceCheckout, InvoicePay
+from app.schemas.invoices import InvoiceCreate, InvoiceCheckout, InvoicePay,RevenueResponse,InvoiceResponse
 from sqlalchemy.orm import Session
+from app.model.user import User
 
 def create_invoice(db: Session, payload: InvoiceCreate):
     session = db.query(ParkingSession).filter(ParkingSession.id == payload.session_id).first()
@@ -68,3 +69,25 @@ def pay_invoice(db: Session, payload: InvoicePay):
     db.commit()
     db.refresh(invoice)
     return invoice
+
+def get_revenue(db: Session, user_id: UUID):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role.name != "Admin":
+        raise HTTPException(status_code=403, detail="You are not authorized to perform this action")
+    invoices = db.query(Invoice).all()
+    total_revenue = 0
+    total_paid_invoices = 0
+    list_invoices = []
+    for invoice in invoices:
+        amount = invoice.amount or 0
+        total_revenue += amount
+        if invoice.status == "paid":
+            total_paid_invoices += amount
+        list_invoices.append(InvoiceResponse.model_validate(invoice))
+    return RevenueResponse(
+        total_revenue=total_revenue,
+        total_paid_invoices=total_paid_invoices,
+        list_invoices=list_invoices
+    )

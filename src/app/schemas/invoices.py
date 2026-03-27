@@ -1,10 +1,11 @@
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
 
 class InvoiceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: UUID
     session_id: UUID
     pricing_rule_id: Optional[UUID]
@@ -24,3 +25,8 @@ class InvoiceCheckout(BaseModel):
 class InvoicePay(BaseModel):
     id: UUID
     payment_method: str
+
+class RevenueResponse(BaseModel):
+    total_revenue: float
+    total_paid_invoices: float
+    list_invoices: list[InvoiceResponse]
