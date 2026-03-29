@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Session
-from app.model import ParkingSlot,User, Sensor
+from sqlalchemy.orm import Session, joinedload
+from app.model import ParkingSlot, User, Sensor
 from app.schemas.parking_slots import (
     ParkingSlotCreate,
     ParkingSlotResponse,
@@ -12,11 +12,11 @@ from datetime import datetime
 from uuid import UUID
 
 
-def create_new_parking_slot(db: Session, payload: ParkingSlotCreate,user_id: UUID) -> ParkingSlotResponse:
-    user_id = db.query(User).filter(User.id == user_id).first()
-    if not user_id:
+def create_new_parking_slot(db: Session, payload: ParkingSlotCreate, user_id: UUID) -> ParkingSlotResponse:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if user_id.role.name != "Admin":
+    if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
 
     parking_slot = ParkingSlot(**payload.dict())
@@ -26,20 +26,20 @@ def create_new_parking_slot(db: Session, payload: ParkingSlotCreate,user_id: UUI
     return parking_slot
 
 def get_parking_slots(db: Session, user_id: UUID) -> list[ParkingSlotResponse]:
-    user_id = db.query(User).filter(User.id == user_id).first()
-    if not user_id:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if user_id.role.name != "Admin":
+    if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
     
     parking_slots = db.query(ParkingSlot).all()
     return parking_slots
 
-def update_parking_slot(db: Session, payload: ParkingSlotUpdate,user_id: UUID) -> ParkingSlotResponse:
-    user_id = db.query(User).filter(User.id == user_id).first()
-    if not user_id:
+def update_parking_slot(db: Session, payload: ParkingSlotUpdate, user_id: UUID) -> ParkingSlotResponse:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if user_id.role.name != "Admin":
+    if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
     parking_slot = db.query(ParkingSlot).filter(ParkingSlot.id == payload.id).first()
     if not parking_slot:
@@ -68,6 +68,27 @@ def get_parking_slots_with_active_sensors(db: Session, user_id: UUID) -> list[Pa
     if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
 
-    parking_slots = db.query(ParkingSlot).join(Sensor).filter(Sensor.status != "đã thay thế").all()
+    parking_slots = db.query(ParkingSlot).all()
+    
+    results = []
+    for slot in parking_slots:
+        valid_sensors = [s for s in slot.sensors if s.status != "đã thay thế"]
+        
+        if not valid_sensors:
+            continue
+            
+        valid_sensors.sort(key=lambda x: x.last_heartbeat, reverse=True)
+        top_sensor = valid_sensors[0]
+        
+        results.append(ParkingSlotWithSensorResponse(
+            id=slot.id,
+            slot_code=slot.slot_code,
+            status=slot.status,
+            position_x=slot.position_x,
+            position_y=slot.position_y,
+            created_at=slot.created_at,
+            updated_at=slot.updated_at,
+            sensors=top_sensor
+        ))
 
-    return parking_slots
+    return results

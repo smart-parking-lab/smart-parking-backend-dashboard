@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, List
 
 class ParkingSlotResponse(BaseModel):
+    model_config = {"from_attributes": True}
     id: UUID
     slot_code: str
     status: str
@@ -14,6 +15,7 @@ class ParkingSlotResponse(BaseModel):
     updated_at: datetime
 
 class Sensor(BaseModel):
+    model_config = {"from_attributes": True}
     id: UUID
     created_at: datetime
     last_heartbeat: datetime
@@ -21,7 +23,7 @@ class Sensor(BaseModel):
     status: str
 
 class ParkingSlotWithSensorResponse(ParkingSlotResponse):
-    sensors: List[Sensor]
+    sensors: Optional[Sensor] = None
 
 class ParkingSlotCreate(BaseModel):
     slot_code: str
