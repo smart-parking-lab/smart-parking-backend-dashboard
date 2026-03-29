@@ -5,6 +5,7 @@ from app.model.user import User
 from app.schemas.sensors import SensorCreate, SensorUpdate, SensorUpdateStatus, SensorResponse
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from app.model.parking_slots import ParkingSlot
 from uuid import UUID
 
 def create_sensor(db: Session, payload: SensorCreate, user_id: str):

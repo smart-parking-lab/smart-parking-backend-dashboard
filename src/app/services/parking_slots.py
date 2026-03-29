@@ -72,7 +72,7 @@ def get_parking_slots_with_active_sensors(db: Session, user_id: UUID) -> list[Pa
     
     results = []
     for slot in parking_slots:
-        valid_sensors = [s for s in slot.sensors if s.status != "đã thay thế"]
+        valid_sensors = [s for s in slot.sensors if s.status != "replaced"]
         
         if not valid_sensors:
             continue
