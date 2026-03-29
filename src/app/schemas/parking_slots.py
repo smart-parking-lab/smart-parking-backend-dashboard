@@ -2,7 +2,7 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 class ParkingSlotResponse(BaseModel):
     id: UUID
@@ -12,6 +12,16 @@ class ParkingSlotResponse(BaseModel):
     position_y: int
     created_at: datetime
     updated_at: datetime
+
+class Sensor(BaseModel):
+    id: UUID
+    created_at: datetime
+    last_heartbeat: datetime
+    sensor_code: str
+    status: str
+
+class ParkingSlotWithSensorResponse(ParkingSlotResponse):
+    sensors: List[Sensor]
 
 class ParkingSlotCreate(BaseModel):
     slot_code: str

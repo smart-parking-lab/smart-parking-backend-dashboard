@@ -1,5 +1,11 @@
 from fastapi import APIRouter, Depends, Request
-from app.schemas.parking_slots import ParkingSlotCreate, ParkingSlotResponse, ParkingSlotUpdate, ParkingSlotStatusUpdate
+from app.schemas.parking_slots import (
+    ParkingSlotCreate,
+    ParkingSlotResponse,
+    ParkingSlotUpdate,
+    ParkingSlotStatusUpdate,
+    ParkingSlotWithSensorResponse
+)
 from app.services import parking_slots
 from sqlalchemy.orm import Session
 from app.utils.database import get_db
@@ -28,3 +34,9 @@ def update_parking_slot(request: Request, payload: ParkingSlotUpdate, db: Sessio
 @router.put("/status", response_model=ParkingSlotResponse)
 def update_parking_slot_status(request: Request, payload: ParkingSlotStatusUpdate, db: Session = Depends(get_db)):
     return parking_slots.update_parking_slot_status(db, payload)
+
+@router.get("/with-sensors", response_model=list[ParkingSlotWithSensorResponse])
+def get_parking_slots_with_sensors(request: Request, db: Session = Depends(get_db)):
+    user_payload = request.state.user
+    user_id = user_payload.get("sub")
+    return parking_slots.get_parking_slots_with_active_sensors(db, user_id)

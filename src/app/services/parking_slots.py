@@ -1,6 +1,12 @@
 from sqlalchemy.orm import Session
-from app.model import ParkingSlot,User
-from app.schemas.parking_slots import ParkingSlotCreate,ParkingSlotResponse,ParkingSlotUpdate,ParkingSlotStatusUpdate
+from app.model import ParkingSlot,User, Sensor
+from app.schemas.parking_slots import (
+    ParkingSlotCreate,
+    ParkingSlotResponse,
+    ParkingSlotUpdate,
+    ParkingSlotStatusUpdate,
+    ParkingSlotWithSensorResponse
+)
 from fastapi import HTTPException
 from datetime import datetime
 from uuid import UUID
@@ -54,3 +60,14 @@ def update_parking_slot_status(db: Session, payload: ParkingSlotStatusUpdate) ->
     db.commit()
     db.refresh(parking_slot)
     return parking_slot
+
+def get_parking_slots_with_active_sensors(db: Session, user_id: UUID) -> list[ParkingSlotWithSensorResponse]:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role.name != "Admin":
+        raise HTTPException(status_code=403, detail="User is not admin")
+
+    parking_slots = db.query(ParkingSlot).join(Sensor).filter(Sensor.status != "đã thay thế").all()
+
+    return parking_slots
