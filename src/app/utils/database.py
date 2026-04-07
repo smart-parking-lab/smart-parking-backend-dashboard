@@ -1,10 +1,10 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.supabase import SessionLocal
 
 
-def get_db():
-    db: Session = SessionLocal()
+async def get_db():
+    db: AsyncSession = SessionLocal()
     try:
         yield db
     finally:
-        db.close()
+        await db.close()

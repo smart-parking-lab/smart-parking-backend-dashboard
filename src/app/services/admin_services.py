@@ -1,10 +1,17 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.model import Role, User, VehicleType, Vehicle
 from app.schemas.admin import RoleResponse, AdminUserResponse, VehicleTypeResponse, AdminVehicleResponse
 from fastapi import HTTPException
 
-def check_admin(db: Session, user_id: str):
-    user = db.query(User).filter(User.id == user_id).first()
+async def check_admin(db: AsyncSession, user_id: str):
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.role))
+        .filter(User.id == user_id)
+    )
+    user = result.scalars().first()
     if not user or not user.role or user.role.name != "Admin":
         raise HTTPException(
             status_code=403, 
@@ -12,13 +19,18 @@ def check_admin(db: Session, user_id: str):
         )
     return user
 
-def get_all_roles(db: Session,user_id:str) -> list[RoleResponse]:
-    check_admin(db,user_id)
-    return db.query(Role).all()
+async def get_all_roles(db: AsyncSession, user_id: str) -> list[RoleResponse]:
+    await check_admin(db, user_id)
+    result = await db.execute(select(Role))
+    return result.scalars().all()
 
-def get_all_users(db: Session,user_id:str) -> list[AdminUserResponse]:
-    check_admin(db,user_id)
-    users = db.query(User).all()
+async def get_all_users(db: AsyncSession, user_id: str) -> list[AdminUserResponse]:
+    await check_admin(db, user_id)
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.role))
+    )
+    users = result.scalars().all()
     return [
         AdminUserResponse(
             id=u.id,
@@ -31,9 +43,13 @@ def get_all_users(db: Session,user_id:str) -> list[AdminUserResponse]:
         ) for u in users
     ]
 
-def get_all_vehicles(db: Session,user_id:str) -> list[AdminVehicleResponse]:
-    check_admin(db,user_id)
-    vehicles = db.query(Vehicle).all()
+async def get_all_vehicles(db: AsyncSession, user_id: str) -> list[AdminVehicleResponse]:
+    await check_admin(db, user_id)
+    result = await db.execute(
+        select(Vehicle)
+        .options(selectinload(Vehicle.user), selectinload(Vehicle.vehicle_type))
+    )
+    vehicles = result.scalars().all()
     return [
         AdminVehicleResponse(
             id=v.id,

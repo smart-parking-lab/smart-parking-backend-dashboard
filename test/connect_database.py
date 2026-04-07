@@ -1,16 +1,16 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import datetime
-from src.app.model.user import User
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+from src.app.model.base import Base
 
+from sqlalchemy.pool import NullPool
 
-DATABASE_URL = "postgresql://postgres.jgxlvshakravvjmdpbml:hethongnhung@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+# Using the same database as production as requested ("test trực tiếp")
+DATABASE_URL = "postgresql+asyncpg://postgres.jgxlvshakravvjmdpbml:hethongnhung@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 
-engine = create_engine(DATABASE_URL)
+engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
 
-Base = declarative_base()
-
-Base.metadata.create_all(engine)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-db = SessionLocal()
+SessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)

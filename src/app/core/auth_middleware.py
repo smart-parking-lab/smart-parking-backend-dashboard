@@ -18,7 +18,10 @@ PUBLIC_PATHS: set[tuple[str, str]] = {
     ("GET",  "/"),
     ("GET",  "/docs"),                 
     ("GET",  "/openapi.json"),          
-    ("GET",  "/redoc"),                 
+    ("GET",  "/redoc"), 
+    # Cho phép Core LPR service gọi nội bộ
+    ("POST", "/api/v1/parking-sessions"),
+    ("PUT",  "/api/v1/parking-sessions"),                
 }
 
 

@@ -1,4 +1,6 @@
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.model import ParkingSlot, User, Sensor
 from app.schemas.parking_slots import (
     ParkingSlotCreate,
@@ -12,8 +14,9 @@ from datetime import datetime
 from uuid import UUID
 
 
-def create_new_parking_slot(db: Session, payload: ParkingSlotCreate, user_id: UUID) -> ParkingSlotResponse:
-    user = db.query(User).filter(User.id == user_id).first()
+async def create_new_parking_slot(db: AsyncSession, payload: ParkingSlotCreate, user_id: UUID) -> ParkingSlotResponse:
+    user_result = await db.execute(select(User).options(selectinload(User.role)).filter(User.id == user_id))
+    user = user_result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.role.name != "Admin":
@@ -21,54 +24,68 @@ def create_new_parking_slot(db: Session, payload: ParkingSlotCreate, user_id: UU
 
     parking_slot = ParkingSlot(**payload.dict())
     db.add(parking_slot)
-    db.commit()
-    db.refresh(parking_slot)
+    await db.commit()
+    await db.refresh(parking_slot)
     return parking_slot
 
-def get_parking_slots(db: Session, user_id: UUID) -> list[ParkingSlotResponse]:
-    user = db.query(User).filter(User.id == user_id).first()
+async def get_parking_slots(db: AsyncSession, user_id: UUID) -> list[ParkingSlotResponse]:
+    user_result = await db.execute(select(User).options(selectinload(User.role)).filter(User.id == user_id))
+    user = user_result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
     
-    parking_slots = db.query(ParkingSlot).all()
-    return parking_slots
+    result = await db.execute(select(ParkingSlot))
+    return result.scalars().all()
 
-def update_parking_slot(db: Session, payload: ParkingSlotUpdate, user_id: UUID) -> ParkingSlotResponse:
-    user = db.query(User).filter(User.id == user_id).first()
+async def update_parking_slot(db: AsyncSession, payload: ParkingSlotUpdate, user_id: UUID) -> ParkingSlotResponse:
+    user_result = await db.execute(select(User).options(selectinload(User.role)).filter(User.id == user_id))
+    user = user_result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
-    parking_slot = db.query(ParkingSlot).filter(ParkingSlot.id == payload.id).first()
+        
+    result = await db.execute(select(ParkingSlot).filter(ParkingSlot.id == payload.id))
+    parking_slot = result.scalars().first()
     if not parking_slot:
         raise HTTPException(status_code=404, detail="Parking slot not found")
+        
     parking_slot.slot_code = payload.slot_code
     parking_slot.status = payload.status
     parking_slot.position_x = payload.position_x
     parking_slot.position_y = payload.position_y
-    db.commit()
-    db.refresh(parking_slot)
+    
+    await db.commit()
+    await db.refresh(parking_slot)
     return parking_slot
 
-def update_parking_slot_status(db: Session, payload: ParkingSlotStatusUpdate) -> ParkingSlotResponse:
-    parking_slot = db.query(ParkingSlot).filter(ParkingSlot.id == payload.id).first()
+async def update_parking_slot_status(db: AsyncSession, payload: ParkingSlotStatusUpdate) -> ParkingSlotResponse:
+    result = await db.execute(select(ParkingSlot).filter(ParkingSlot.id == payload.id))
+    parking_slot = result.scalars().first()
     if not parking_slot:
         raise HTTPException(status_code=404, detail="Parking slot not found")
+        
     parking_slot.status = payload.status
-    db.commit()
-    db.refresh(parking_slot)
+    await db.commit()
+    await db.refresh(parking_slot)
     return parking_slot
 
-def get_parking_slots_with_active_sensors(db: Session, user_id: UUID) -> list[ParkingSlotWithSensorResponse]:
-    user = db.query(User).filter(User.id == user_id).first()
+
+async def get_parking_slots_with_active_sensors(db: AsyncSession, user_id: UUID) -> list[ParkingSlotWithSensorResponse]:
+    user_result = await db.execute(select(User).options(selectinload(User.role)).filter(User.id == user_id))
+    user = user_result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.role.name != "Admin":
         raise HTTPException(status_code=403, detail="User is not admin")
 
-    parking_slots = db.query(ParkingSlot).all()
+    result = await db.execute(
+        select(ParkingSlot)
+        .options(selectinload(ParkingSlot.sensors))
+    )
+    parking_slots = result.scalars().all()
     
     results = []
     for slot in parking_slots:

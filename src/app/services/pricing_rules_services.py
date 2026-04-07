@@ -1,38 +1,41 @@
-from app.validators.vehicle_validator import validate_vehicle_type_name
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi import HTTPException
 from app.model import PricingRule
-from app.schemas.pricing_rules import PricingRuleCreate,PricingRuleResponse,updatePricingRule
+from app.schemas.pricing_rules import PricingRuleCreate, PricingRuleResponse, updatePricingRule
 from app.services.admin_services import check_admin
 from app.model.vehicle_type import VehicleType
 
-def creat_new_pricing_rule(db: Session, pricing_rule: PricingRuleCreate, user_id: str) -> PricingRuleResponse:
-    check_admin(db, user_id)
-    vehicle_type = db.query(VehicleType).filter(VehicleType.id == pricing_rule.vehicle_type_id).first()
+from sqlalchemy.orm import selectinload
+
+async def creat_new_pricing_rule(db: AsyncSession, pricing_rule: PricingRuleCreate, user_id: str) -> PricingRuleResponse:
+    await check_admin(db, user_id)
+    result = await db.execute(select(VehicleType).filter(VehicleType.id == pricing_rule.vehicle_type_id))
+    vehicle_type = result.scalars().first()
     if not vehicle_type:
         raise HTTPException(status_code=404, detail="Vehicle type not found")
     
     new_pricing_rule = PricingRule(**pricing_rule.dict())
     db.add(new_pricing_rule)
-    db.commit()
-    db.refresh(new_pricing_rule)
+    await db.commit()
+    await db.refresh(new_pricing_rule)
     return new_pricing_rule
 
-def get_all_pricing_rules(db: Session) -> list[PricingRuleResponse]:
-    
-    pricing_rules = db.query(PricingRule).all()
-    
-    return pricing_rules
+async def get_all_pricing_rules(db: AsyncSession) -> list[PricingRuleResponse]:
+    result = await db.execute(select(PricingRule).options(selectinload(PricingRule.vehicle_type)))
+    return result.scalars().all()
 
-def update_pricing_rule(db: Session, pricing_rule_new: updatePricingRule,user_id:str) -> PricingRuleResponse:
-    check_admin(db,user_id)
-    pricing_rule = db.query(PricingRule).filter(PricingRule.id == pricing_rule_new.id).first()
+async def update_pricing_rule(db: AsyncSession, pricing_rule_new: updatePricingRule, user_id: str) -> PricingRuleResponse:
+    await check_admin(db, user_id)
+    result = await db.execute(select(PricingRule).filter(PricingRule.id == pricing_rule_new.id))
+    pricing_rule = result.scalars().first()
     
     if not pricing_rule:
         raise HTTPException(status_code=404, detail="Pricing rule not found")
     
     # Check if vehicle type exists
-    vehicle_type = db.query(VehicleType).filter(VehicleType.id == pricing_rule_new.vehicle_type_id).first()
+    vt_result = await db.execute(select(VehicleType).filter(VehicleType.id == pricing_rule_new.vehicle_type_id))
+    vehicle_type = vt_result.scalars().first()
     
     if not vehicle_type:
         raise HTTPException(status_code=404, detail="Vehicle type not found")
@@ -47,6 +50,7 @@ def update_pricing_rule(db: Session, pricing_rule_new: updatePricingRule,user_id
     pricing_rule.priority = pricing_rule_new.priority
     pricing_rule.is_active = pricing_rule_new.is_active
     pricing_rule.vehicle_type_id = pricing_rule_new.vehicle_type_id
-    db.commit()
-    db.refresh(pricing_rule)
+    
+    await db.commit()
+    await db.refresh(pricing_rule)
     return pricing_rule
