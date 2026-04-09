@@ -29,13 +29,6 @@ async def create_new_parking_slot(db: AsyncSession, payload: ParkingSlotCreate, 
     return parking_slot
 
 async def get_parking_slots(db: AsyncSession, user_id: UUID) -> list[ParkingSlotResponse]:
-    user_result = await db.execute(select(User).options(selectinload(User.role)).filter(User.id == user_id))
-    user = user_result.scalars().first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user.role.name != "Admin":
-        raise HTTPException(status_code=403, detail="User is not admin")
-    
     result = await db.execute(select(ParkingSlot))
     return result.scalars().all()
 
