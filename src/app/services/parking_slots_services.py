@@ -28,7 +28,7 @@ async def create_new_parking_slot(db: AsyncSession, payload: ParkingSlotCreate, 
     await db.refresh(parking_slot)
     return parking_slot
 
-async def get_parking_slots(db: AsyncSession, user_id: UUID) -> list[ParkingSlotResponse]:
+async def get_parking_slots(db: AsyncSession) -> list[ParkingSlotResponse]:
     result = await db.execute(select(ParkingSlot))
     return result.scalars().all()
 
